@@ -16,16 +16,18 @@ import java.util.logging.*;
 
 /*************************************************************
  * 
- * @author David Wu
+ * @Author David Wu
  * Date:28 Aug 2016
- * This is a test class access jira server via jira rest api 
+ * This is a test class try to changes jira workflow 
+ * transitions for select issue via jira rest api 
  */
 public class JiraRestClient
 {
 	/***************************
 	 * Note:
 	 * on JIRA server make sure the 'Allow Remote API Calls' is turned ON under Administration > General Configuration.
-	 * on jira server: make sure give this test issue anonymous access for all operation permission via permission scheme
+	 * on jira server: make sure give this test issue anonymous access for edit issue permission via permission scheme
+	 * for login user need to get session cookie from jira server than add this auth session to request header for each operation
 	 */
 	private static final Logger LOGGER = Logger.getLogger(JiraRestClient.class.getName() );
 	static final String JIRA_BASE_URL = "http://rhe-jira-test01.test.lan:8280/jira/rest/api/2/issue/";
@@ -36,22 +38,27 @@ public class JiraRestClient
 		 
 		try {
 			
+			// input issue id
+			BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 			
-			String issueId = "ISBCS-240/";
-			String transUrl = JIRA_BASE_URL + issueId + "transitions?";
+			System.out.println("please input issueId that you want change transition \n");
+			String issueId = br.readLine().trim();
+			String getTransUrl = JIRA_BASE_URL + issueId + "/transitions?";
+			String doTransUrl = JIRA_BASE_URL + issueId + "/transitions?expand=transitions.fields";
 			
 			// create client
 			HttpClient httpClient = HttpClientBuilder.create().build();
             
 			// get transitions option for this issue 
-			showResult(getValidTransitions(transUrl, httpClient));
+			showResult(getValidTransitions(getTransUrl, httpClient));
 			
 			// login jira and get session details
-			showResult(logInJira(JIRA_AUTH_URL, httpClient));
+			//showResult(logInJira(JIRA_AUTH_URL, httpClient));
 			
 			// Execute change transition request via session id/value (add to header) 
-			showResult(changeTransitions(issueId,JIRA_BASE_URL + issueId,httpClient));
- 
+			System.out.println("\n **** check above transition options and input the target transition id ... ***\n");
+			String transId = br.readLine().trim();
+			showResult(changeTransitions(issueId,transId,doTransUrl,httpClient));
 		} 
 		catch (ClientProtocolException e) {
 			e.printStackTrace();
@@ -71,7 +78,7 @@ public class JiraRestClient
 		  // create a getRequest
 		  HttpGet getRequest = new HttpGet(url);
 		  getRequest.setHeader("Content-type", "application/json");
-		  LOGGER.info("send getValidTransitions request =" + getRequest.toString());
+		  LOGGER.info("send getValidTransitions request =" + getRequest.toString() + "\n");
 		  return client.execute(getRequest);
 	}
 	
@@ -84,35 +91,37 @@ public class JiraRestClient
 			StringEntity authParam = new StringEntity(JSON_LOGIN_DATA);
 			authPostrequest.setEntity(authParam);
 			authPostrequest.setHeader("Content-type", "application/json");
-			LOGGER.info("send logInJira request = " + authPostrequest.toString());
+			LOGGER.info("*** send logInJira request = " + authPostrequest.toString());
 			return(client.execute(authPostrequest));		
 	}
 	
-	public static HttpResponse changeTransitions(String issueId, String url, HttpClient client) 
+	public static HttpResponse changeTransitions(String issueId, String transId, String url, HttpClient client) 
 			throws ClientProtocolException, IOException
 	{		
 			// should extract from response of logInJira request, for quick test - hard code-in here 
-		    String jsonTransId = "{\"id\":\"141\"}";
+		    String jsonData = "{\"transition\":{\"id\":\"" + transId + "\"}}";
+		    LOGGER.info("*** json data = " + jsonData + "\n");
+		    
 			// Create new getRequest
 			HttpPost postRequest = new HttpPost(url);
-			StringEntity param = new StringEntity(jsonTransId);
+			StringEntity param = new StringEntity(jsonData);
 			postRequest.setEntity(param);
 			postRequest.setHeader("Content-type", "application/json");	
-			
-			// ****  change transition may require Cookie-based Authentication ***	
-			// more details see www
-			// https://developer.atlassian.com/jiradev/jira-apis/jira-rest-apis/jira-rest-api-tutorials/jira-rest-api-example-cookie-based-authentication
-			// this pat currently not working - response return 405 error - method not allowed for the request resource 
-			LOGGER.info("send changeTransitions request = " + postRequest.toString());
+			LOGGER.info("\n *** send changeTransitions request = " + postRequest.toString()  + "\n");
 			return(client.execute(postRequest));
 	}
 	
 	public static void showResult(HttpResponse response) throws IOException{		
 			// Check for HTTP response code: 200 = success
+		    if (response.getStatusLine().getStatusCode() == 204) {
+				LOGGER.info("\n The server has successfully fulfilled the request  ... \n");
+				System.exit(0);
+		    }
+		     	     
 		    if (response.getStatusLine().getStatusCode() != 200) {
 				throw new RuntimeException("Failed : HTTP error code : " + response.getStatusLine().getStatusCode());
-		    }			
-			 
+		    }
+		    
 		    //get all headers
 		    /*
 		    Header[] headers = response.getAllHeaders();

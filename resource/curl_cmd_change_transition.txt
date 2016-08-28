@@ -1,0 +1,18 @@
+curl example:
+
+check valid transitions:
+curl -v -H "Content-Type: application/json" -X GET  http://jiraBaseUrl/rest/api/2/issue/issueId/transitions?
+
+Get Session:
+curl -v -u username:password -H "Content-Type: application/json" -X POST http://jiraBaseUrl/rest/auth/1/session
+
+change transition
+curl -v -D- -X POST --data {\"transition\":{\"id\":\"transId\"}} -H "Content-Type: application/json" http://jiraBaseUrl/rest/api/2/issue/issueId/transitions?expand=transitions.fields
+
+test.json
+
+{
+    "transition": {
+        "id": "141"
+    }
+}
